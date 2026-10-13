@@ -1,0 +1,287 @@
+// DeviceLab data model. Enum values must match packages/shared-types/src/enums.ts.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  LEAD
+  TESTER
+  VIEWER
+}
+
+enum Platform {
+  ANDROID
+  IOS
+}
+
+enum DeviceStatus {
+  AVAILABLE
+  IN_USE
+  OFFLINE
+  MAINTENANCE
+}
+
+enum HostStatus {
+  ONLINE
+  OFFLINE
+  REVOKED
+}
+
+enum ReservationStatus {
+  SCHEDULED
+  ACTIVE
+  RELEASED
+  EXPIRED
+  CANCELLED
+}
+
+enum ReservationKind {
+  INTERACTIVE
+  AUTOMATION
+}
+
+enum ReleaseReason {
+  USER
+  IDLE
+  EXPIRED
+  FORCED
+  DEVICE_OFFLINE
+}
+
+enum ArtifactType {
+  SCREENSHOT
+  RECORDING
+  LOGCAT
+  SYSLOG
+  APPIUM_LOG
+}
+
+model Team {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @unique
+  users     User[]
+  projects  Project[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+/// A client engagement (e.g. "USFB", "Tata Capital") used to group devices and builds.
+model Project {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  code      String   @unique
+  teamId    String?  @db.Uuid
+  team      Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  devices   Device[]
+  builds    Build[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([teamId])
+}
+
+model User {
+  id            String         @id @default(uuid()) @db.Uuid
+  name          String
+  email         String         @unique
+  passwordHash  String
+  role          Role           @default(TESTER)
+  teamId        String?        @db.Uuid
+  team          Team?          @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  isActive      Boolean        @default(true)
+  lastLoginAt   DateTime?
+  reservations  Reservation[]  @relation("ReservationUser")
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  builds        Build[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([teamId])
+}
+
+/// Rotating refresh tokens. A token is "<id>.<secret>"; only sha256(secret) is stored.
+/// Reusing a rotated token revokes the whole family (theft detection).
+model RefreshToken {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  familyId     String    @db.Uuid
+  tokenHash    String
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?   @db.Uuid
+  ip           String?
+  userAgent    String?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+model Host {
+  id             String     @id @default(uuid()) @db.Uuid
+  name           String     @unique
+  os             String     @default("unknown")
+  ip             String?
+  agentVersion   String?
+  status         HostStatus @default(OFFLINE)
+  lastSeenAt     DateTime?
+  capabilities   Json?
+  /// sha256 of the per-host agent token. The token itself is shown to the admin once.
+  tokenHash      String     @unique
+  tokenRevokedAt DateTime?
+  devices        Device[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+}
+
+model Device {
+  id           String        @id @default(uuid()) @db.Uuid
+  /// adb serial (Android) or UDID (iOS).
+  udid         String        @unique
+  platform     Platform
+  /// Optional friendly name set by an admin.
+  name         String?
+  model        String
+  manufacturer String
+  osVersion    String
+  screenW      Int           @default(0)
+  screenH      Int           @default(0)
+  hostId       String        @db.Uuid
+  host         Host          @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  /// Derived from online / maintenance / cleaning / active reservation. Persisted for filtering.
+  status       DeviceStatus  @default(OFFLINE)
+  online       Boolean       @default(false)
+  maintenance  Boolean       @default(false)
+  /// True while the agent runs post-session cleanup; the device reads as IN_USE until done.
+  cleaning     Boolean       @default(false)
+  tags         String[]      @default([])
+  projectId    String?       @db.Uuid
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  batteryLevel Int?
+  simNumber    String?
+  notes        String?
+  /// Network, storage, temperature… as last reported by the agent.
+  details      Json?
+  health       Json?
+  lastSeenAt   DateTime?
+  offlineSince DateTime?
+  removedAt    DateTime?
+  reservations Reservation[]
+  artifacts    Artifact[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([status])
+  @@index([hostId])
+  @@index([platform, osVersion])
+  @@index([projectId])
+}
+
+model Reservation {
+  id                String            @id @default(uuid()) @db.Uuid
+  deviceId          String            @db.Uuid
+  device            Device            @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  userId            String            @db.Uuid
+  user              User              @relation("ReservationUser", fields: [userId], references: [id], onDelete: Cascade)
+  kind              ReservationKind   @default(INTERACTIVE)
+  status            ReservationStatus @default(ACTIVE)
+  purpose           String?
+  startAt           DateTime          @default(now())
+  endAt             DateTime
+  releasedAt        DateTime?
+  releaseReason     ReleaseReason?
+  releasedById      String?           @db.Uuid
+  /// Packages installed during this reservation; removed on cleanup.
+  installedPackages String[]          @default([])
+  sessions          Session[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // A partial unique index (one ACTIVE reservation per device) is added in the migration SQL.
+  @@index([deviceId, status])
+  @@index([userId, status])
+  @@index([status, endAt])
+}
+
+model Session {
+  id               String      @id @default(uuid()) @db.Uuid
+  reservationId    String      @db.Uuid
+  reservation      Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  startedAt        DateTime    @default(now())
+  endedAt          DateTime?
+  recordingKey     String?
+  disconnectReason String?
+  artifacts        Artifact[]
+
+  @@index([reservationId])
+}
+
+model Build {
+  id             String   @id @default(uuid()) @db.Uuid
+  projectId      String?  @db.Uuid
+  project        Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  platform       Platform
+  fileName       String
+  appName        String?
+  version        String?
+  buildNumber    String?
+  /// Android package name or iOS bundle id.
+  packageId      String?
+  minSdk         Int?
+  sizeBytes      BigInt
+  storageKey     String   @unique
+  checksumSha256 String
+  releaseNotes   String?
+  uploadedById   String   @db.Uuid
+  uploadedBy     User     @relation(fields: [uploadedById], references: [id])
+  uploadedAt     DateTime @default(now())
+
+  @@index([projectId, uploadedAt])
+  @@index([checksumSha256])
+}
+
+model Artifact {
+  id          String       @id @default(uuid()) @db.Uuid
+  sessionId   String?      @db.Uuid
+  session     Session?     @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  deviceId    String?      @db.Uuid
+  device      Device?      @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  type        ArtifactType
+  fileName    String
+  contentType String
+  sizeBytes   BigInt
+  storageKey  String       @unique
+  createdById String?      @db.Uuid
+  createdAt   DateTime     @default(now())
+
+  @@index([sessionId])
+  @@index([deviceId, createdAt])
+}
+
+/// Append-only. Written for logins, reservations, installs, sessions, downloads and admin changes.
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @db.Uuid
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String?
+  entityId   String?
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
+  @@index([action, createdAt])
+}

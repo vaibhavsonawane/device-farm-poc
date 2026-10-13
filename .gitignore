@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.turbo/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+apps/server/storage/
+apps/host-agent/agent.config.json
+apps/host-agent/vendor/
+infra/nginx/certs/*
+!infra/nginx/certs/.gitkeep
+apps/portal/test-results/
+apps/portal/playwright-report/
+.DS_Store
+storage-test/

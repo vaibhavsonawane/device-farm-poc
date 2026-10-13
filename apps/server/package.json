@@ -1,0 +1,63 @@
+{
+  "name": "@devicelab/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DeviceLab Control Server (NestJS)",
+  "scripts": {
+    "build": "prisma generate && nest build",
+    "dev": "nest start --watch --preserveWatchOutput",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src test",
+    "test": "vitest run",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:seed": "prisma db seed"
+  },
+  "prisma": {
+    "seed": "node -r ts-node/register/transpile-only src/cli/seed.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.700.0",
+    "@devicelab/protocol": "workspace:*",
+    "@devicelab/shared-types": "workspace:*",
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/platform-express": "^11.1.6",
+    "@nestjs/platform-socket.io": "^11.1.6",
+    "@nestjs/swagger": "^11.2.0",
+    "@nestjs/throttler": "^6.4.0",
+    "@nestjs/websockets": "^11.1.6",
+    "@prisma/client": "6.19.3",
+    "argon2": "^0.44.0",
+    "helmet": "^8.1.0",
+    "ioredis": "^5.8.0",
+    "multer": "^2.0.2",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "socket.io": "^4.8.1",
+    "ws": "^8.18.3",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@devicelab/config": "workspace:*",
+    "@nestjs/cli": "^11.0.10",
+    "@nestjs/testing": "^11.1.6",
+    "@swc/core": "^1.13.5",
+    "@types/express": "^5.0.3",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^20.19.0",
+    "@types/supertest": "^6.0.3",
+    "@types/ws": "^8.18.1",
+    "eslint": "^9.37.0",
+    "prisma": "6.19.3",
+    "socket.io-client": "^4.8.1",
+    "supertest": "^7.1.4",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.8.3",
+    "unplugin-swc": "^1.5.7",
+    "vitest": "^3.2.4"
+  }
+}
