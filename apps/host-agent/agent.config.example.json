@@ -1,0 +1,13 @@
+{
+  "serverUrl": "https://devicelab.bank.local",
+  "agentToken": "dlh_paste_the_token_from_Admin_Hosts_here",
+  "hostName": "qa-android-rack-01",
+  "adbPath": "adb",
+  "goIosPath": "ios",
+  "wdaBundleId": "com.facebook.WebDriverAgentRunner.xctrunner",
+  "appiumPortRange": [4723, 4799],
+  "allowedSerials": [],
+  "healthPort": 4100,
+  "caFile": "/etc/devicelab/internal-ca.pem",
+  "logLevel": "info"
+}

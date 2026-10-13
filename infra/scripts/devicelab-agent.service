@@ -1,0 +1,21 @@
+[Unit]
+Description=DeviceLab Host Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=devicelab
+Group=plugdev
+WorkingDirectory=/opt/devicelab-agent
+ExecStartPre=/usr/bin/adb start-server
+ExecStart=/usr/bin/node /opt/devicelab-agent/dist/main.js --config /etc/devicelab/agent.config.json
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=15
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

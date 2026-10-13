@@ -15,3 +15,6 @@ apps/portal/test-results/
 apps/portal/playwright-report/
 .DS_Store
 storage-test/
+apps/portal/blob-report/
+infra/.env
+dump.rdb

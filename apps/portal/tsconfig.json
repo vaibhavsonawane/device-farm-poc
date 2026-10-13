@@ -1,0 +1,20 @@
+{
+  "extends": "@devicelab/config/tsconfig.react.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["vite/client"],
+    "paths": {
+      "@devicelab/shared-types": ["../../packages/shared-types/src/index.ts"],
+      "@devicelab/protocol": ["../../packages/protocol/src/index.ts"],
+      "@devicelab/ui": ["../../packages/ui/src/index.ts"]
+    }
+  },
+  "include": [
+    "src",
+    "e2e",
+    "playwright.config.ts",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "../../packages/ui/src/stream/jmuxer.d.ts"
+  ]
+}

@@ -37,6 +37,8 @@ export const envSchema = z.object({
   S3_BUCKET: z.string().default('devicelab'),
   S3_ACCESS_KEY: z.string().default(''),
   S3_SECRET_KEY: z.string().default(''),
+  /** Login attempts per minute per client IP. */
+  AUTH_LOGIN_LIMIT_PER_MIN: z.coerce.number().int().min(1).default(10),
   UPLOAD_MAX_MB: z.coerce.number().int().min(1).default(500),
 
   RESERVATION_DEFAULT_MIN: z.coerce.number().int().min(5).default(30),

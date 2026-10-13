@@ -25,6 +25,9 @@ import { AuthService } from './auth.service';
 
 const logoutSchema = z.object({ refreshToken: z.string().max(512).optional() });
 
+// Read at import time because @Throttle takes static options (main.ts loads .env first).
+const loginLimit = Math.max(1, Number(process.env.AUTH_LOGIN_LIMIT_PER_MIN ?? 10) || 10);
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -36,7 +39,7 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(200)
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Throttle({ default: { limit: loginLimit, ttl: 60_000 } })
   @ApiZodBody(loginRequestSchema)
   login(
     @Body(new ZodPipe(loginRequestSchema)) body: LoginRequest,

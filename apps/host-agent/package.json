@@ -1,0 +1,42 @@
+{
+  "name": "@devicelab/host-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DeviceLab Host Agent — runs on device host machines",
+  "main": "dist/main.js",
+  "bin": {
+    "devicelab-agent": "dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx watch src/main.ts",
+    "dev:mock": "tsx watch src/main.ts --mock",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "fetch:scrcpy": "node scripts/fetch-scrcpy-server.mjs",
+    "package": "pnpm build && pkg dist/main.js --targets node20-linux-x64,node20-macos-arm64,node20-macos-x64,node20-win-x64 --out-path release"
+  },
+  "dependencies": {
+    "@devicefarmer/adbkit": "^3.3.8",
+    "@devicelab/protocol": "workspace:*",
+    "@devicelab/shared-types": "workspace:*",
+    "jpeg-js": "^0.4.4",
+    "pino": "^9.9.0",
+    "socket.io-client": "^4.8.1",
+    "ws": "^8.18.3",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@devicelab/config": "workspace:*",
+    "@types/node": "^20.19.0",
+    "@types/ws": "^8.18.1",
+    "@yao-pkg/pkg": "^6.6.0",
+    "eslint": "^9.37.0",
+    "pino-pretty": "^13.1.1",
+    "tsx": "^4.20.5",
+    "typescript": "~5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

@@ -68,9 +68,13 @@ export class AgentGateway implements OnGatewayInit, OnGatewayConnection {
     const ip = socket.handshake.address;
     this.registry.register(hostId, socket);
 
+    // iOS devices can only be driven from macOS (Xcode/WDA); mock hosts may simulate them.
+    let allowIos = false;
+
     socket.on('agent:hello', (raw, ack) => {
       const hello = safeParse(agentHelloSchema, raw);
       if (!hello) return ack({ ok: false, error: 'invalid hello' });
+      allowIos = hello.os === 'darwin' || hello.capabilities.mock;
       void this.hosts
         .onAgentHello(hostId, hello, ip)
         .then((knownSerials) =>
@@ -89,6 +93,11 @@ export class AgentGateway implements OnGatewayInit, OnGatewayConnection {
     socket.on('device:upsert', (raw) => {
       const report = safeParse(deviceReportSchema, raw);
       if (!report) return this.logger.warn(`host ${hostId}: invalid device report`);
+      if (report.platform === 'IOS' && !allowIos) {
+        return this.logger.warn(
+          `host ${hostId}: ignoring iOS device ${report.serial} from a non-macOS host`,
+        );
+      }
       void this.devices
         .upsertFromReport(hostId, report)
         .catch((err: Error) => this.logger.error(`device upsert: ${err.message}`));

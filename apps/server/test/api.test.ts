@@ -241,6 +241,52 @@ describe('host agent registration', () => {
   });
 });
 
+describe('platform rules', () => {
+  it('ignores iOS devices reported by a non-macOS host', async () => {
+    const res = await http()
+      .post('/api/hosts')
+      .set(auth('admin'))
+      .send({ name: 'linux-host-2' })
+      .expect(201);
+    const linux: AgentClient = io(`${base}${AGENT_NAMESPACE}`, {
+      auth: { token: res.body.agentToken },
+      transports: ['websocket'],
+    });
+    await new Promise<void>((resolve) => linux.on('connect', () => resolve()));
+    await linux.emitWithAck('agent:hello', {
+      hostName: 'linux-host-2',
+      agentVersion: '0.1.0',
+      os: 'linux',
+      capabilities: { android: true, ios: false, appium: false, mock: false },
+    });
+    const ios = {
+      platform: 'IOS',
+      state: 'online',
+      model: 'iPhone 15',
+      manufacturer: 'Apple',
+      osVersion: '17.4',
+      screenW: 1179,
+      screenH: 2556,
+      batteryLevel: 80,
+    } as const;
+    linux.emit('device:upsert', { serial: 'IOS-ON-LINUX', ...ios });
+    linux.emit('device:upsert', {
+      serial: 'ANDROID-ON-LINUX',
+      ...ios,
+      platform: 'ANDROID',
+      model: 'Pixel 7',
+    });
+    await until(async () =>
+      (await http().get('/api/devices').set(auth('admin'))).body.some(
+        (d: { udid: string }) => d.udid === 'ANDROID-ON-LINUX',
+      ),
+    );
+    const list = (await http().get('/api/devices').set(auth('admin'))).body as { udid: string }[];
+    expect(list.map((d) => d.udid)).not.toContain('IOS-ON-LINUX');
+    linux.disconnect();
+  });
+});
+
 describe('reservations, sessions and the stream relay', () => {
   let reservationId: string;
   let sessionId: string;
