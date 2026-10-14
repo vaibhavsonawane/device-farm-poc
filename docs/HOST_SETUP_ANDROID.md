@@ -106,6 +106,15 @@ root detection, SSL pinning and device binding: ask the app team for lab builds.
 
 ## 7. Troubleshooting
 
+Start with the built-in check. It runs the same steps as a live session and names the one that fails:
+
+```bash
+node apps/host-agent/dist/main.js --doctor --config /etc/devicelab/agent.config.json          # all devices
+node apps/host-agent/dist/main.js --doctor <serial> --config /etc/devicelab/agent.config.json # one device
+```
+
+While a session starts, the portal also shows the current step (pushing scrcpy-server, starting it, waiting for the encoder).
+
 | Problem                         | Check                                                                                                    |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | Device missing                  | `adb devices -l` on the host. Try another cable or port and check the hub's power.                       |

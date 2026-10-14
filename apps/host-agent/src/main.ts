@@ -3,6 +3,7 @@
 import os from 'node:os';
 import { loadConfig, parseArgs } from './config';
 import { DeviceManager } from './device-manager';
+import { runDoctor } from './doctor';
 import { AndroidDriver } from './drivers/android/android-driver';
 import { type DeviceDriver } from './drivers/driver';
 import { IosDriver } from './drivers/ios/ios-driver';
@@ -17,6 +18,7 @@ const SIGNATURE = 'Crafted by Vaibhav Sonawane through Claude';
 const HELP = `DeviceLab Host Agent ${AGENT_VERSION}
 
 Usage: devicelab-agent [--config agent.config.json] [--mock]
+       devicelab-agent --doctor [serial]   Diagnose adb, scrcpy-server and screen streaming
 
   -c, --config <file>  Config file (default: ./agent.config.json or $DEVICELAB_AGENT_CONFIG)
       --mock           Simulate 3 Android + 2 iOS devices (no phones needed)
@@ -55,6 +57,10 @@ async function main(): Promise<void> {
     return;
   }
   const cfg = loadConfig(args);
+  if (args.doctor) {
+    process.exitCode = await runDoctor(cfg, args.doctorSerial);
+    return;
+  }
   logger.level = process.env.LOG_LEVEL ?? cfg.logLevel;
 
   const drivers: DeviceDriver[] = [];

@@ -42,16 +42,30 @@ export interface CliArgs {
   configPath: string | null;
   help: boolean;
   version: boolean;
+  /** `--doctor [serial]`: diagnose adb, scrcpy-server and streaming, then exit. */
+  doctor: boolean;
+  doctorSerial: string | null;
 }
 
 export function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = { mock: false, configPath: null, help: false, version: false };
+  const args: CliArgs = {
+    mock: false,
+    configPath: null,
+    help: false,
+    version: false,
+    doctor: false,
+    doctorSerial: null,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--mock') args.mock = true;
     else if (a === '--help' || a === '-h') args.help = true;
     else if (a === '--version' || a === '-v') args.version = true;
-    else if (a === '--config' || a === '-c') args.configPath = argv[++i] ?? null;
+    else if (a === '--doctor') {
+      args.doctor = true;
+      const next = argv[i + 1];
+      if (next && !next.startsWith('-')) args.doctorSerial = argv[++i] ?? null;
+    } else if (a === '--config' || a === '-c') args.configPath = argv[++i] ?? null;
     else if (a?.startsWith('--config=')) args.configPath = a.slice('--config='.length);
   }
   return args;

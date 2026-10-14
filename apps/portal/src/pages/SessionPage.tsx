@@ -314,6 +314,11 @@ function SessionView({ device, join, live, reservation }: SessionViewProps) {
             <CircularProgress size={28} color="inherit" />
           )}
           <Typography variant="body2">{text}</Typography>
+          {starting && live.streamStatus?.message && (
+            <Typography variant="caption" sx={{ opacity: 0.8 }} data-testid="stream-step">
+              {live.streamStatus.message}
+            </Typography>
+          )}
           {live.error && <Typography variant="caption">{live.error}</Typography>}
         </Stack>
       );

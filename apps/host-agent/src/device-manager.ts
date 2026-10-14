@@ -167,8 +167,9 @@ export class DeviceManager {
         active.lastKeyframeRequest = now;
         active.handle?.requestKeyframe();
       };
+      status('starting', 'Opening the stream channel to the server…');
       await link.connect();
-      status('starting');
+      status('starting', 'Stream channel open; starting device capture…');
       active.handle = await driver.startStream(cmd.serial, cmd.quality, {
         sendFrame: (frame) => {
           const type = frame[1];

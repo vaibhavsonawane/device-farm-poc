@@ -97,7 +97,16 @@ export class ScrcpySession implements StreamHandle {
     this.stopped = false;
     const scid = randomInt(0, 0x7fffffff).toString(16).padStart(8, '0');
     this.port = await freePort();
-    await this.adb.forward(this.serial, `tcp:${this.port}`, `localabstract:scrcpy_${scid}`);
+    const step = (msg: string): void => {
+      this.log.info({ serial: this.serial }, `stream start: ${msg}`);
+      this.sink.status('starting', msg);
+    };
+    step(`adb forward tcp:${this.port} → scrcpy_${scid}`);
+    await withTimeout(
+      this.adb.forward(this.serial, `tcp:${this.port}`, `localabstract:scrcpy_${scid}`),
+      10_000,
+      'adb forward timed out (is the adb server responsive? try `adb kill-server`)',
+    );
     const cmd = scrcpyServerArgs({
       scid,
       maxSize: this.quality.maxSize,
@@ -106,7 +115,12 @@ export class ScrcpySession implements StreamHandle {
       jarPath: DEVICE_JAR_PATH,
       codecOptions: this.codecOptions,
     });
-    this.serverProc = await this.adb.shellStream(this.serial, cmd);
+    step('Starting scrcpy-server on the device…');
+    this.serverProc = await withTimeout(
+      this.adb.shellStream(this.serial, cmd),
+      10_000,
+      'adb shell did not open (device busy or adb unresponsive)',
+    );
     let serverOutput = '';
     this.serverProc.on('data', (d: Buffer) => {
       const text = d.toString().trim();
@@ -121,10 +135,10 @@ export class ScrcpySession implements StreamHandle {
       );
 
     // With tunnel_forward the adb forward accepts immediately; the server is ready once the
-    // dummy byte arrives on the first (video) socket. Give it ~15 s (first start can be slow).
+    // dummy byte arrives on the first (video) socket. Give it ~12 s (first start can be slow).
     let video: net.Socket | null = null;
     let reader: ByteReader | null = null;
-    const deadline = Date.now() + 15_000;
+    const deadline = Date.now() + 12_000;
     while (Date.now() < deadline && !this.stopped) {
       let s: net.Socket | null = null;
       try {
@@ -145,6 +159,7 @@ export class ScrcpySession implements StreamHandle {
       );
     }
     this.videoSocket = video;
+    step('Video socket connected; opening control socket…');
 
     // The server accepts video → control, and only then sends device meta + codec meta.
     // Connect the control socket BEFORE reading anything else, or both sides wait forever.
@@ -154,13 +169,14 @@ export class ScrcpySession implements StreamHandle {
 
     const nameField = await withTimeout(
       reader.read(SCRCPY_DEVICE_NAME_FIELD_LENGTH),
-      10_000,
+      8_000,
       'scrcpy-server sent no device metadata',
     ).catch((e: Error) => Promise.reject(fail(e.message)));
     const deviceName = nameField.toString('utf8').replace(/\0.*$/s, '');
+    step('Waiting for the device video encoder…');
     const codecMeta = await withTimeout(
       reader.read(SCRCPY_CODEC_META_SIZE),
-      10_000,
+      8_000,
       'scrcpy-server sent no video header (the device encoder may have failed — try a lower quality)',
     ).catch((e: Error) => Promise.reject(fail(e.message)));
     const codecId = codecMeta.readUInt32BE(0);

@@ -154,7 +154,8 @@ export class StreamRelayService implements OnModuleInit, OnModuleDestroy {
           quality: room.quality,
           streamPath: `${STREAM_AGENT_PATH}?token=${encodeURIComponent(token)}`,
         },
-        30_000,
+        // The agent bounds each start step itself (≈45 s worst case) and reports progress.
+        60_000,
       );
       if (!res.ok) {
         this.events.streamStatus({ sessionId, state: 'error', message: res.error });

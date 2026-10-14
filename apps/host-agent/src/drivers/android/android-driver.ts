@@ -11,7 +11,8 @@ import {
   type StreamHandle,
   type StreamSink,
 } from '../driver';
-import { AdbBridge, shq } from './adb';
+import { AdbBridge, shq, withTimeout } from './adb';
+import { checkScrcpyJar } from './scrcpy-jar';
 import {
   diffInstalled,
   parseBattery,
@@ -189,11 +190,16 @@ export class AndroidDriver implements DeviceDriver {
     return k;
   }
 
-  private async ensureJar(serial: string, k: Known): Promise<void> {
+  private async ensureJar(serial: string, k: Known, sink?: StreamSink): Promise<void> {
     if (k.jarPushed) return;
-    if (!existsSync(this.cfg.scrcpyServerPath))
-      throw new Error(`scrcpy-server missing at ${this.cfg.scrcpyServerPath}`);
-    await this.adb.push(serial, this.cfg.scrcpyServerPath, DEVICE_JAR_PATH);
+    const problem = checkScrcpyJar(this.cfg.scrcpyServerPath);
+    if (problem) throw new Error(problem);
+    sink?.status('starting', 'Pushing scrcpy-server to the device…');
+    await withTimeout(
+      this.adb.push(serial, this.cfg.scrcpyServerPath, DEVICE_JAR_PATH),
+      30_000,
+      'pushing scrcpy-server to the device timed out',
+    );
     k.jarPushed = true;
   }
 
@@ -203,7 +209,7 @@ export class AndroidDriver implements DeviceDriver {
     sink: StreamSink,
   ): Promise<StreamHandle> {
     const k = this.ready(serial);
-    await this.ensureJar(serial, k);
+    await this.ensureJar(serial, k, sink);
     await this.sessions.get(serial)?.stop();
     const session = new ScrcpySession(
       this.adb,
