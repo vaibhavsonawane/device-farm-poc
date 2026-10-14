@@ -3,9 +3,10 @@ import { STREAM_QUALITY_PRESETS } from '@devicelab/shared-types';
 import pino from 'pino';
 import { type AgentConfig } from './config';
 import { AdbBridge, withTimeout } from './drivers/android/adb';
-import { DEVICE_JAR_PATH, ScrcpySession } from './drivers/android/scrcpy-session';
-import { deviceCrashLog, remoteSha256, scrcpyStartupProbe } from './drivers/android/diagnostics';
-import { SCRCPY_SERVER_SHA256, checkScrcpyJar } from './drivers/android/scrcpy-jar';
+import { ensureDeviceJar } from './drivers/android/device-jar';
+import { ScrcpySession } from './drivers/android/scrcpy-session';
+import { deviceCrashLog, scrcpyStartupProbe } from './drivers/android/diagnostics';
+import { checkScrcpyJar } from './drivers/android/scrcpy-jar';
 import { AGENT_VERSION } from './version';
 
 const ok = (msg: string): void => void process.stdout.write(`  \x1b[32m✔\x1b[0m ${msg}\n`);
@@ -78,25 +79,12 @@ export async function runDoctor(cfg: AgentConfig, serial: string | null): Promis
         continue;
       }
       const t0 = Date.now();
-      await withTimeout(
-        adb.push(d.id, cfg.scrcpyServerPath, DEVICE_JAR_PATH),
-        30_000,
-        'push timed out',
-      );
-      ok(`pushed scrcpy-server (${Date.now() - t0} ms)`);
-      const remote = await remoteSha256(adb, d.id, DEVICE_JAR_PATH);
-      if (remote === null) info('device has no sha256sum; skipping on-device checksum');
-      else if (remote === SCRCPY_SERVER_SHA256) ok('scrcpy-server checksum on the device matches');
-      else {
-        failures++;
-        bad(
-          `scrcpy-server on the device is corrupt (sha256 ${remote.slice(0, 12)}…) — check cable/hub`,
-        );
-        continue;
-      }
+      // Same atomic, versioned install the agent uses: safe to run while the agent is live.
+      const jarPath = await ensureDeviceJar(adb, d.id, cfg.scrcpyServerPath);
+      ok(`scrcpy-server installed and verified on the device (${Date.now() - t0} ms): ${jarPath}`);
 
       // Start the JVM without sockets: proves the jar loads and lists the H.264 encoders.
-      const probe = await scrcpyStartupProbe(adb, d.id, DEVICE_JAR_PATH).catch(
+      const probe = await scrcpyStartupProbe(adb, d.id, jarPath).catch(
         (e: Error) => `probe failed: ${e.message}`,
       );
       const encoders = probe.split(/\r?\n/).filter((l) => /video-codec=h264/.test(l));
@@ -131,6 +119,7 @@ export async function runDoctor(cfg: AgentConfig, serial: string | null): Promis
         },
         pino({ level: process.env.LOG_LEVEL ?? 'warn' }),
         cfg.scrcpyCodecOptions,
+        jarPath,
       );
       const t1 = Date.now();
       try {

@@ -32,9 +32,8 @@ import { type Logger } from '../../logger';
 import { type StreamHandle, type StreamSink } from '../driver';
 import { type AdbBridge, withTimeout } from './adb';
 import { ByteReader } from './byte-reader';
+import { DEVICE_JAR_PATH } from './device-jar';
 import { deviceCrashLog } from './diagnostics';
-
-export const DEVICE_JAR_PATH = '/data/local/tmp/scrcpy-server.jar';
 
 /** A black frame at typical bit rates encodes to a tiny IDR; real UIs are far larger. */
 const SECURE_IDR_MAX_BYTES = 6 * 1024;
@@ -92,6 +91,8 @@ export class ScrcpySession implements StreamHandle {
     private readonly sink: StreamSink,
     private readonly log: Logger,
     private readonly codecOptions?: string,
+    /** scrcpy-server location on the device (see ensureDeviceJar). */
+    private readonly jarPath: string = DEVICE_JAR_PATH,
   ) {}
 
   async start(): Promise<void> {
@@ -113,7 +114,7 @@ export class ScrcpySession implements StreamHandle {
       maxSize: this.quality.maxSize,
       bitRate: this.quality.bitRate,
       maxFps: this.quality.maxFps,
-      jarPath: DEVICE_JAR_PATH,
+      jarPath: this.jarPath,
       codecOptions: this.codecOptions,
     });
     step('Starting scrcpy-server on the device…');
@@ -146,7 +147,12 @@ export class ScrcpySession implements StreamHandle {
       const lines = await deviceCrashLog(this.adb, this.serial);
       if (lines.length)
         this.log.error({ serial: this.serial, deviceLog: lines }, 'scrcpy-server crash log');
-      const err = fail(msg);
+      const classMissing = lines.some((l) => l.includes('ClassNotFoundException'));
+      const err = fail(
+        classMissing
+          ? `${msg}: the scrcpy-server file on the device was missing or incomplete (another agent or a --doctor run may have been replacing it)`
+          : msg,
+      );
       return lines.length
         ? new Error(`${err.message}. Device log: ${lines.slice(-6).join(' | ').slice(0, 900)}`)
         : err;

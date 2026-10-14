@@ -83,9 +83,17 @@ async function main(): Promise<void> {
   await manager.start(link);
   link.start();
   const health = startHealthServer(cfg.healthPort, link, manager);
-  health.on('error', (err) =>
-    logger.warn({ err: err.message, port: cfg.healthPort }, 'health endpoint unavailable'),
-  );
+  health.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      logger.error(
+        { port: cfg.healthPort },
+        'another DeviceLab agent is probably already running on this host (health port in use). ' +
+          'Run only one agent per host: two agents driving the same phones break screen streaming.',
+      );
+    } else {
+      logger.warn({ err: err.message, port: cfg.healthPort }, 'health endpoint unavailable');
+    }
+  });
   logger.info(
     { port: cfg.healthPort },
     'health endpoint on http://127.0.0.1:%d/health',
