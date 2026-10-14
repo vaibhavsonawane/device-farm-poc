@@ -199,10 +199,16 @@ export class AndroidDriver implements DeviceDriver {
     // Two attempts: if the server dies at startup, re-push scrcpy-server and retry once.
     let session: ScrcpySession;
     for (let attempt = 0; ; attempt++) {
-      const jarPath = await ensureDeviceJar(this.adb, serial, this.cfg.scrcpyServerPath, {
-        force: attempt > 0,
-        onStatus: (msg) => sink.status('starting', msg),
-      });
+      let force = attempt > 0;
+      // Called before every (re)start, so watchdog restarts re-install a missing jar too.
+      const jar = async (): Promise<string> => {
+        const path = await ensureDeviceJar(this.adb, serial, this.cfg.scrcpyServerPath, {
+          force,
+          onStatus: (msg) => sink.status('starting', msg),
+        });
+        force = false;
+        return path;
+      };
       const candidate = new ScrcpySession(
         this.adb,
         serial,
@@ -210,7 +216,7 @@ export class AndroidDriver implements DeviceDriver {
         sink,
         this.log.child({ serial }),
         this.cfg.scrcpyCodecOptions,
-        jarPath,
+        jar,
       );
       try {
         await candidate.start();

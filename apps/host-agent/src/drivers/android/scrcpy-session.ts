@@ -32,7 +32,7 @@ import { type Logger } from '../../logger';
 import { type StreamHandle, type StreamSink } from '../driver';
 import { type AdbBridge, withTimeout } from './adb';
 import { ByteReader } from './byte-reader';
-import { DEVICE_JAR_PATH } from './device-jar';
+import { DEVICE_JAR_PATH, makeLaunchCopy, removeLaunchCopy } from './device-jar';
 import { deviceCrashLog } from './diagnostics';
 
 /** A black frame at typical bit rates encodes to a tiny IDR; real UIs are far larger. */
@@ -73,6 +73,7 @@ export class ScrcpySession implements StreamHandle {
   private videoSocket: net.Socket | null = null;
   private controlSocket: net.Socket | null = null;
   private serverProc: Duplex | null = null;
+  private launchCopy: string | null = null;
   private port = 0;
   private stopped = false;
   private frameW = 0;
@@ -91,8 +92,11 @@ export class ScrcpySession implements StreamHandle {
     private readonly sink: StreamSink,
     private readonly log: Logger,
     private readonly codecOptions?: string,
-    /** scrcpy-server location on the device (see ensureDeviceJar). */
-    private readonly jarPath: string = DEVICE_JAR_PATH,
+    /**
+     * Installed scrcpy-server on the device, or a function that (re)installs it
+     * and returns its path (see ensureDeviceJar) — called before every start.
+     */
+    private readonly jar: string | (() => Promise<string>) = DEVICE_JAR_PATH,
   ) {}
 
   async start(): Promise<void> {
@@ -109,12 +113,15 @@ export class ScrcpySession implements StreamHandle {
       10_000,
       'adb forward timed out (is the adb server responsive? try `adb kill-server`)',
     );
+    // scrcpy-server deletes the file it runs from, so each run gets its own copy.
+    const installed = typeof this.jar === 'string' ? this.jar : await this.jar();
+    this.launchCopy = await makeLaunchCopy(this.adb, this.serial, installed);
     const cmd = scrcpyServerArgs({
       scid,
       maxSize: this.quality.maxSize,
       bitRate: this.quality.bitRate,
       maxFps: this.quality.maxFps,
-      jarPath: this.jarPath,
+      jarPath: this.launchCopy,
       codecOptions: this.codecOptions,
     });
     step('Starting scrcpy-server on the device…');
@@ -150,7 +157,7 @@ export class ScrcpySession implements StreamHandle {
       const classMissing = lines.some((l) => l.includes('ClassNotFoundException'));
       const err = fail(
         classMissing
-          ? `${msg}: the scrcpy-server file on the device was missing or incomplete (another agent or a --doctor run may have been replacing it)`
+          ? `${msg}: the scrcpy-server file on the device was missing or incomplete (an older agent build may be running on this host — run only one agent, version 0.1.4 or later)`
           : msg,
       );
       return lines.length
@@ -411,6 +418,8 @@ export class ScrcpySession implements StreamHandle {
     this.serverProc = null;
     if (this.port) await this.adb.removeForward(this.serial, `tcp:${this.port}`);
     this.port = 0;
+    if (this.launchCopy) await removeLaunchCopy(this.adb, this.serial, this.launchCopy);
+    this.launchCopy = null;
   }
 
   async stop(): Promise<void> {

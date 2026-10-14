@@ -96,6 +96,42 @@ export async function ensureDeviceJar(
   return finalPath;
 }
 
+/**
+ * scrcpy-server deletes the file it was started from: its CleanUp process (and
+ * list mode, e.g. `list_encoders`) call `unlinkSelf()`. So never start it from
+ * the installed jar — start every run from a throwaway copy, and the installed
+ * file survives for the next start, watchdog restart, quality change or probe.
+ */
+export async function makeLaunchCopy(
+  adb: AdbBridge,
+  serial: string,
+  jarPath: string,
+): Promise<string> {
+  const copy = `/data/local/tmp/devicelab-scrcpy-run-${randomBytes(4).toString('hex')}.jar`;
+  // `cat` exists on every Android version (toybox `cp` only from Android 6).
+  const out = await adb.shell(
+    serial,
+    `cat ${shq(jarPath)} > ${shq(copy)} && echo DEVICELAB_OK`,
+    10_000,
+  );
+  if (!out.includes('DEVICELAB_OK')) {
+    await removeLaunchCopy(adb, serial, copy);
+    throw new Error(
+      `scrcpy-server is missing on the device (${out.trim().slice(0, 200) || jarPath})`,
+    );
+  }
+  return copy;
+}
+
+/** Delete a launch copy (scrcpy usually deletes it itself; this catches crashed runs). */
+export async function removeLaunchCopy(
+  adb: AdbBridge,
+  serial: string,
+  copy: string,
+): Promise<void> {
+  await adb.shell(serial, `rm -f ${shq(copy)}`, 10_000).catch(() => undefined);
+}
+
 function sha256File(file: string): string {
   return createHash('sha256').update(readFileSync(file)).digest('hex');
 }

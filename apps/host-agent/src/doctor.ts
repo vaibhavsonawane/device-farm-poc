@@ -3,7 +3,7 @@ import { STREAM_QUALITY_PRESETS } from '@devicelab/shared-types';
 import pino from 'pino';
 import { type AgentConfig } from './config';
 import { AdbBridge, withTimeout } from './drivers/android/adb';
-import { ensureDeviceJar } from './drivers/android/device-jar';
+import { ensureDeviceJar, makeLaunchCopy, removeLaunchCopy } from './drivers/android/device-jar';
 import { ScrcpySession } from './drivers/android/scrcpy-session';
 import { deviceCrashLog, scrcpyStartupProbe } from './drivers/android/diagnostics';
 import { checkScrcpyJar } from './drivers/android/scrcpy-jar';
@@ -84,9 +84,12 @@ export async function runDoctor(cfg: AgentConfig, serial: string | null): Promis
       ok(`scrcpy-server installed and verified on the device (${Date.now() - t0} ms): ${jarPath}`);
 
       // Start the JVM without sockets: proves the jar loads and lists the H.264 encoders.
-      const probe = await scrcpyStartupProbe(adb, d.id, jarPath).catch(
-        (e: Error) => `probe failed: ${e.message}`,
-      );
+      // From a throwaway copy: scrcpy-server deletes the file it was started from.
+      const probe = await makeLaunchCopy(adb, d.id, jarPath)
+        .then((copy) =>
+          scrcpyStartupProbe(adb, d.id, copy).finally(() => removeLaunchCopy(adb, d.id, copy)),
+        )
+        .catch((e: Error) => `probe failed: ${e.message}`);
       const encoders = probe.split(/\r?\n/).filter((l) => /video-codec=h264/.test(l));
       if (/Aborted|ERROR|Exception|probe failed/i.test(probe) || !/encoder/i.test(probe)) {
         failures++;
