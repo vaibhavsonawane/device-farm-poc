@@ -158,7 +158,7 @@ StreamLink   — one binary WebSocket per active session
 Health       — GET /health on localhost
 ```
 
-- scrcpy-server **v3.3.1** (pinned; the version string must match the jar).
+- scrcpy-server **v3.3.4** (pinned; the version string must match the jar).
   Video over a forwarded `localabstract:scrcpy_<scid>` socket, with 12-byte
   packet headers (bit 63 = config, bit 62 = key frame). Control over the second
   socket.
@@ -233,7 +233,7 @@ Appium (Phase 3), enterprise SSO and dashboards (Phase 4).
 | Production compose (TLS Nginx + CSP, migrations, seed, agent over `wss://` with internal CA)                                                                                                                                          | ✅                                                                                                                                                                                                      |
 | Relay round trip (portal → server → agent → portal), LAN/loopback                                                                                                                                                                     | ~1–25 ms                                                                                                                                                                                                |
 | Mock H.264 throughput (432×960, x264 zerolatency)                                                                                                                                                                                     | ~30 fps                                                                                                                                                                                                 |
-| Real Android device + scrcpy-server 3.3.1                                                                                                                                                                                             | ⚠️ Not yet exercised: no phone in the build environment. The driver follows the scrcpy 3.x wire format and is type-checked; first run on a real host should confirm the < 150 ms touch-to-screen target |
+| Real Android device + scrcpy-server 3.3.4                                                                                                                                                                                             | ⚠️ Not yet exercised: no phone in the build environment. The driver follows the scrcpy 3.x wire format and is type-checked; first run on a real host should confirm the < 150 ms touch-to-screen target |
 
 Known gaps carried into later phases: real-device validation of the Android
 driver, iOS driver (Phase 2), build metadata parsing, recording and Appium

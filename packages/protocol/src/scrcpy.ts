@@ -4,7 +4,7 @@
  */
 import { DeviceKey, KeyAction, KeyMeta, TouchAction } from './frames';
 
-export const SCRCPY_SERVER_VERSION = '3.3.1';
+export const SCRCPY_SERVER_VERSION = '3.3.4';
 
 export const ScrcpyControlType = {
   INJECT_KEYCODE: 0,

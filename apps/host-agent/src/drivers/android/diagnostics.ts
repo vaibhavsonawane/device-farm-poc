@@ -18,8 +18,9 @@ export async function remoteSha256(
   return m ? m[1]! : null;
 }
 
+// Matches both `brief` ("F/libc    ( 123): …") and threadtime log formats.
 const CRASH_PATTERN =
-  /scrcpy|AndroidRuntime|FATAL|Abort|DEBUG\s*:|libc\s*:|art\s*:|dalvikvm|app_process/i;
+  /scrcpy|AndroidRuntime|fatal|abort|JNI|tombstone|\bDEBUG\b|\blibc\b|\bart\b|dalvikvm|app_process/i;
 
 /**
  * Recent device log lines that explain why app_process / scrcpy-server died
@@ -30,7 +31,10 @@ export async function deviceCrashLog(
   serial: string,
   maxLines = 25,
 ): Promise<string[]> {
-  const out = await adb.shell(serial, 'logcat -d -v brief -t 800', 15_000).catch(() => '');
+  // Native crashes (SIGABRT, JNI FatalError) are logged to the separate `crash` buffer.
+  const out = await adb
+    .shell(serial, 'logcat -d -v brief -b main -b system -b crash -t 1500', 15_000)
+    .catch(() => '');
   return out
     .split(/\r?\n/)
     .filter((l) => CRASH_PATTERN.test(l))

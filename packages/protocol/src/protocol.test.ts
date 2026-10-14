@@ -186,7 +186,7 @@ describe('scrcpy control messages', () => {
 
   it('builds server args and validates scid', () => {
     const args = scrcpyServerArgs({ scid: '0a1b2c3d', maxSize: 1280, bitRate: 4e6, maxFps: 30 });
-    expect(args).toContain('com.genymobile.scrcpy.Server 3.3.1');
+    expect(args).toContain('com.genymobile.scrcpy.Server 3.3.4');
     expect(args).toContain('scid=0a1b2c3d');
     expect(args).toContain('max_size=1280');
     expect(() =>

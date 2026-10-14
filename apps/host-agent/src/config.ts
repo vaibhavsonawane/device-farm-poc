@@ -15,10 +15,10 @@ export const agentConfigSchema = z.object({
   adbPath: z.string().default('adb'),
   adbHost: z.string().default('127.0.0.1'),
   adbPort: z.number().int().default(5037),
-  /** Path to scrcpy-server (v3.3.1). `pnpm fetch:scrcpy` downloads it to vendor/. */
+  /** Path to scrcpy-server (v3.3.4). `pnpm fetch:scrcpy` downloads it to vendor/. */
   scrcpyServerPath: z
     .string()
-    .default(path.resolve(__dirname, '..', 'vendor', 'scrcpy-server-v3.3.1')),
+    .default(path.resolve(__dirname, '..', 'vendor', 'scrcpy-server-v3.3.4')),
   /** Optional MediaCodec hints passed to scrcpy (e.g. "latency:int=0"). */
   scrcpyCodecOptions: z
     .string()

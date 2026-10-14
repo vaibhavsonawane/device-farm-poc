@@ -191,7 +191,7 @@ export class AndroidDriver implements DeviceDriver {
     return k;
   }
 
-  /** Push scrcpy-server unless the device already has the exact v3.3.1 file; verify after pushing. */
+  /** Push scrcpy-server unless the device already has the exact v3.3.4 file; verify after pushing. */
   private async ensureJar(serial: string, k: Known, sink?: StreamSink): Promise<void> {
     if (k.jarPushed) return;
     const problem = checkScrcpyJar(this.cfg.scrcpyServerPath);

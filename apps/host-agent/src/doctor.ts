@@ -39,7 +39,7 @@ export async function runDoctor(cfg: AgentConfig, serial: string | null): Promis
   if (jarProblem) {
     failures++;
     bad(jarProblem);
-  } else ok(`scrcpy-server v3.3.1 present: ${cfg.scrcpyServerPath}`);
+  } else ok(`scrcpy-server v3.3.4 present: ${cfg.scrcpyServerPath}`);
 
   // 3. adb + devices
   const adb = new AdbBridge({ host: cfg.adbHost, port: cfg.adbPort, bin: cfg.adbPath });

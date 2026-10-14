@@ -176,7 +176,7 @@ export class ScrcpySession implements StreamHandle {
       throw await failWithDeviceLog(
         exited
           ? 'scrcpy-server exited on the device before accepting connections'
-          : 'scrcpy-server did not start (check the jar is v3.3.1 and USB debugging is allowed)',
+          : 'scrcpy-server did not start (check the jar is v3.3.4 and USB debugging is allowed)',
       );
     }
     this.videoSocket = video;

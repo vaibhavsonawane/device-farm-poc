@@ -52,3 +52,18 @@ describe('adb output parsers', () => {
     expect(parseLogcatLine('--------- beginning of main')).toBeNull();
   });
 });
+
+describe('device crash log filter', () => {
+  it('keeps native crash lines from the crash buffer and drops noise', async () => {
+    const { deviceCrashLog } = await import('./diagnostics');
+    const log = [
+      'F/libc    ( 4321): Fatal signal 6 (SIGABRT), code -1 in tid 4321 (app_process)',
+      "F/DEBUG   (  999): Abort message: 'JNI FatalError called: java.lang.Error thrown during binder transaction'",
+      'I/ActivityManager(  500): Start proc 1234:com.example/u0a1 for activity',
+    ].join('\n');
+    const adb = { shell: async () => log } as unknown as Parameters<typeof deviceCrashLog>[0];
+    const lines = await deviceCrashLog(adb, 'SERIAL');
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain('JNI FatalError');
+  });
+});

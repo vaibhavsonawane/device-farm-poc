@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// Download scrcpy-server v3.3.1 (Apache-2.0, Genymobile) into vendor/ and verify its SHA-256.
+// Download scrcpy-server v3.3.4 (Apache-2.0, Genymobile) into vendor/ and verify its SHA-256.
 // Air-gapped hosts: copy the file in manually and set scrcpyServerPath in agent.config.json.
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const VERSION = '3.3.1';
-const SHA256 = 'a0f70b20aa4998fbf658c94118cd6c8dab6abbb0647a3bdab344d70bc1ebcbb8';
+const VERSION = '3.3.4';
+const SHA256 = '8588238c9a5a00aa542906b6ec7e6d5541d9ffb9b5d0f6e1bc0e365e2303079e';
 const URL = `https://github.com/Genymobile/scrcpy/releases/download/v${VERSION}/scrcpy-server-v${VERSION}`;
 const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'vendor');
 const dest = path.join(dir, `scrcpy-server-v${VERSION}`);

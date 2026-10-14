@@ -2,9 +2,9 @@ import { SCRCPY_SERVER_VERSION } from '@devicelab/protocol';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 
-/** SHA-256 of the official scrcpy-server v3.3.1 release asset. */
+/** SHA-256 of the official scrcpy-server v3.3.4 release asset. */
 export const SCRCPY_SERVER_SHA256 =
-  'a0f70b20aa4998fbf658c94118cd6c8dab6abbb0647a3bdab344d70bc1ebcbb8';
+  '8588238c9a5a00aa542906b6ec7e6d5541d9ffb9b5d0f6e1bc0e365e2303079e';
 
 /** Returns a human-readable problem with the configured jar, or null if it is the expected file. */
 export function checkScrcpyJar(path: string): string | null {

@@ -2,7 +2,7 @@
 
 An Android host is any Linux, Windows or macOS machine with phones attached
 over USB. It runs the **DeviceLab Host Agent**, which talks to the phones
-through ADB and streams their screens with **scrcpy-server v3.3.1**.
+through ADB and streams their screens with **scrcpy-server v3.3.4**.
 
 ## 1. Hardware
 
@@ -30,11 +30,11 @@ Then, in the agent directory:
 
 ```bash
 pnpm --filter @devicelab/host-agent build
-node apps/host-agent/scripts/fetch-scrcpy-server.mjs   # downloads and checksum-verifies scrcpy-server v3.3.1
+node apps/host-agent/scripts/fetch-scrcpy-server.mjs   # downloads and checksum-verifies scrcpy-server v3.3.4
 ```
 
-On an air-gapped host, copy `scrcpy-server-v3.3.1` from a machine with
-internet access (SHA-256 `a0f70b20aa4998fbf658c94118cd6c8dab6abbb0647a3bdab344d70bc1ebcbb8`)
+On an air-gapped host, copy `scrcpy-server-v3.3.4` from a machine with
+internet access (SHA-256 `8588238c9a5a00aa542906b6ec7e6d5541d9ffb9b5d0f6e1bc0e365e2303079e`)
 and set `scrcpyServerPath` in the config.
 
 A single-binary build is also available: `pnpm --filter @devicelab/host-agent package`
@@ -119,8 +119,8 @@ While a session starts, the portal also shows the current step (pushing scrcpy-s
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Device missing                      | `adb devices -l` on the host. Try another cable or port and check the hub's power.                                                                                                                                                                                                                        |
 | `unauthorized`                      | Accept the RSA prompt. Otherwise revoke USB debugging authorisations on the phone and replug.                                                                                                                                                                                                             |
-| Stream never starts                 | Check that `scrcpyServerPath` exists and is v3.3.1, and look for `scrcpy-server` lines in the agent log.                                                                                                                                                                                                  |
-| "agent did not answer stream:start" | The host runs an old agent build or a step is stuck. Rebuild and restart the agent (Admin → Hosts should show agent **0.1.1** or later), then run `--doctor`.                                                                                                                                             |
-| `scrcpy-server said: Aborted`       | Android killed the server process at startup. The session error and agent log include the device log lines that explain it; `--doctor` runs a standalone start. Manual check: `adb shell CLASSPATH=/data/local/tmp/scrcpy-server.jar app_process / com.genymobile.scrcpy.Server 3.3.1 list_encoders=true` |
+| Stream never starts                 | Check that `scrcpyServerPath` exists and is v3.3.4, and look for `scrcpy-server` lines in the agent log.                                                                                                                                                                                                  |
+| "agent did not answer stream:start" | The host runs an old agent build or a step is stuck. Rebuild and restart the agent (Admin → Hosts should show agent **0.1.2** or later), then run `--doctor`.                                                                                                                                             |
+| `scrcpy-server said: Aborted`       | Android killed the server process at startup. The session error and agent log include the device log lines that explain it; `--doctor` runs a standalone start. Manual check: `adb shell CLASSPATH=/data/local/tmp/scrcpy-server.jar app_process / com.genymobile.scrcpy.Server 3.3.4 list_encoders=true` |
 | Touches don't register (Xiaomi)     | Turn on "USB debugging (Security settings)".                                                                                                                                                                                                                                                              |
 | Choppy video                        | Lower the quality (Low = 800 px, 1.5 Mbit/s). Check host CPU, USB bandwidth and hub power.                                                                                                                                                                                                                |
