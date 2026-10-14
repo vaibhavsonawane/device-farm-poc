@@ -213,7 +213,12 @@ export class AndroidDriver implements DeviceDriver {
       this.log.child({ serial }),
       this.cfg.scrcpyCodecOptions,
     );
-    await session.start();
+    try {
+      await session.start();
+    } catch (err) {
+      await session.stop(); // remove the adb forward and kill the server process
+      throw err;
+    }
     this.sessions.set(serial, session);
     const stop = session.stop.bind(session);
     session.stop = async () => {

@@ -287,8 +287,23 @@ function SessionView({ device, join, live, reservation }: SessionViewProps) {
         </Alert>
       );
     }
+    if (live.streamStatus?.state === 'error' && !stats?.width) {
+      return (
+        <Alert severity="error" sx={{ m: 2, maxWidth: 320 }} data-testid="stream-error">
+          The device stream could not start: {live.streamStatus.message ?? 'unknown error'}. Check
+          the host agent log, then release and reserve the device again.
+        </Alert>
+      );
+    }
     if (live.state !== 'live' || !stats?.width) {
-      const text = live.state === 'live' ? 'Waiting for first frame…' : LINK_TEXT[live.state];
+      const starting =
+        live.streamStatus?.state === 'starting' || live.streamStatus?.state === 'restarting';
+      const text =
+        live.state === 'live'
+          ? starting
+            ? 'Starting screen capture on the device…'
+            : 'Waiting for first frame…'
+          : LINK_TEXT[live.state];
       return (
         <Stack
           alignItems="center"
@@ -300,9 +315,6 @@ function SessionView({ device, join, live, reservation }: SessionViewProps) {
           )}
           <Typography variant="body2">{text}</Typography>
           {live.error && <Typography variant="caption">{live.error}</Typography>}
-          {live.streamStatus?.state === 'error' && (
-            <Typography variant="caption">{live.streamStatus.message}</Typography>
-          )}
         </Stack>
       );
     }

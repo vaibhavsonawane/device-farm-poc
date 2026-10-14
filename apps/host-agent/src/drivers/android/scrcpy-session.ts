@@ -30,7 +30,7 @@ import net from 'node:net';
 import { type Duplex } from 'node:stream';
 import { type Logger } from '../../logger';
 import { type StreamHandle, type StreamSink } from '../driver';
-import { type AdbBridge } from './adb';
+import { type AdbBridge, withTimeout } from './adb';
 import { ByteReader } from './byte-reader';
 
 export const DEVICE_JAR_PATH = '/data/local/tmp/scrcpy-server.jar';
@@ -107,50 +107,67 @@ export class ScrcpySession implements StreamHandle {
       codecOptions: this.codecOptions,
     });
     this.serverProc = await this.adb.shellStream(this.serial, cmd);
+    let serverOutput = '';
     this.serverProc.on('data', (d: Buffer) => {
       const text = d.toString().trim();
-      if (text) this.log.debug({ scrcpy: text }, 'scrcpy-server');
+      if (!text) return;
+      serverOutput = (serverOutput + '\n' + text).slice(-2000);
+      this.log.info({ scrcpy: text }, 'scrcpy-server output');
       if (/ERROR|Exception/.test(text)) this.sink.status('error', text.slice(0, 300));
     });
+    const fail = (msg: string): Error =>
+      new Error(
+        serverOutput ? `${msg}. scrcpy-server said: ${serverOutput.trim().slice(-400)}` : msg,
+      );
 
-    // With tunnel_forward the adb forward accepts immediately; the server is ready once the dummy byte arrives.
+    // With tunnel_forward the adb forward accepts immediately; the server is ready once the
+    // dummy byte arrives on the first (video) socket. Give it ~15 s (first start can be slow).
     let video: net.Socket | null = null;
     let reader: ByteReader | null = null;
-    for (let attempt = 0; attempt < 100 && !this.stopped; attempt++) {
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline && !this.stopped) {
       let s: net.Socket | null = null;
       try {
         s = await connect(this.port);
         const r = new ByteReader(s);
-        await Promise.race([
-          r.read(1),
-          sleep(1500).then(() => Promise.reject(new Error('no dummy byte'))),
-        ]);
+        await withTimeout(r.read(1), 1500, 'no dummy byte');
         video = s;
         reader = r;
         break;
       } catch {
         s?.destroy();
-        await sleep(100);
+        await sleep(150);
       }
     }
-    if (!video || !reader)
-      throw new Error(
-        'scrcpy-server did not start (is the jar version 3.3.1 and USB debugging allowed?)',
+    if (!video || !reader) {
+      throw fail(
+        'scrcpy-server did not start (check the jar is v3.3.1 and USB debugging is allowed)',
       );
+    }
     this.videoSocket = video;
 
-    const nameField = await reader.read(SCRCPY_DEVICE_NAME_FIELD_LENGTH);
+    // The server accepts video → control, and only then sends device meta + codec meta.
+    // Connect the control socket BEFORE reading anything else, or both sides wait forever.
+    this.controlSocket = await connect(this.port);
+    this.controlSocket.on('data', () => undefined); // device → client messages (clipboard echo) are ignored
+    this.controlSocket.on('error', () => undefined);
+
+    const nameField = await withTimeout(
+      reader.read(SCRCPY_DEVICE_NAME_FIELD_LENGTH),
+      10_000,
+      'scrcpy-server sent no device metadata',
+    ).catch((e: Error) => Promise.reject(fail(e.message)));
     const deviceName = nameField.toString('utf8').replace(/\0.*$/s, '');
-    const codecMeta = await reader.read(SCRCPY_CODEC_META_SIZE);
+    const codecMeta = await withTimeout(
+      reader.read(SCRCPY_CODEC_META_SIZE),
+      10_000,
+      'scrcpy-server sent no video header (the device encoder may have failed — try a lower quality)',
+    ).catch((e: Error) => Promise.reject(fail(e.message)));
     const codecId = codecMeta.readUInt32BE(0);
     if (codecId !== SCRCPY_CODEC_ID_H264)
       throw new Error(`unexpected codec 0x${codecId.toString(16)}`);
     this.frameW = codecMeta.readUInt32BE(4);
     this.frameH = codecMeta.readUInt32BE(8);
-
-    this.controlSocket = await connect(this.port);
-    this.controlSocket.on('data', () => undefined); // device → client messages (clipboard echo) are ignored
-    this.controlSocket.on('error', () => undefined);
 
     this.log.info({ deviceName, w: this.frameW, h: this.frameH }, 'scrcpy stream up');
     this.sink.status('streaming', `H.264 ${this.frameW}×${this.frameH}`);

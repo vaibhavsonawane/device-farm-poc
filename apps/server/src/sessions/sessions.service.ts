@@ -85,7 +85,9 @@ export class SessionsService {
         ip,
       });
     }
-    await this.relay
+    // Don't hold the HTTP request while the phone starts its encoder: the portal opens its
+    // stream socket right away and shows progress/errors from session:stream-status.
+    void this.relay
       .ensureStreaming(session.id, body.quality ?? STREAM_QUALITY_PRESETS.MEDIUM)
       .catch((err: Error) => {
         // Not fatal: the viewer socket retries, and the portal shows the stream status.
