@@ -4,7 +4,8 @@ import pino from 'pino';
 import { type AgentConfig } from './config';
 import { AdbBridge, withTimeout } from './drivers/android/adb';
 import { DEVICE_JAR_PATH, ScrcpySession } from './drivers/android/scrcpy-session';
-import { checkScrcpyJar } from './drivers/android/scrcpy-jar';
+import { deviceCrashLog, remoteSha256, scrcpyStartupProbe } from './drivers/android/diagnostics';
+import { SCRCPY_SERVER_SHA256, checkScrcpyJar } from './drivers/android/scrcpy-jar';
 import { AGENT_VERSION } from './version';
 
 const ok = (msg: string): void => void process.stdout.write(`  \x1b[32m✔\x1b[0m ${msg}\n`);
@@ -83,6 +84,35 @@ export async function runDoctor(cfg: AgentConfig, serial: string | null): Promis
         'push timed out',
       );
       ok(`pushed scrcpy-server (${Date.now() - t0} ms)`);
+      const remote = await remoteSha256(adb, d.id, DEVICE_JAR_PATH);
+      if (remote === null) info('device has no sha256sum; skipping on-device checksum');
+      else if (remote === SCRCPY_SERVER_SHA256) ok('scrcpy-server checksum on the device matches');
+      else {
+        failures++;
+        bad(
+          `scrcpy-server on the device is corrupt (sha256 ${remote.slice(0, 12)}…) — check cable/hub`,
+        );
+        continue;
+      }
+
+      // Start the JVM without sockets: proves the jar loads and lists the H.264 encoders.
+      const probe = await scrcpyStartupProbe(adb, d.id, DEVICE_JAR_PATH).catch(
+        (e: Error) => `probe failed: ${e.message}`,
+      );
+      const encoders = probe.split(/\r?\n/).filter((l) => /video-codec=h264/.test(l));
+      if (/Aborted|ERROR|Exception|probe failed/i.test(probe) || !/encoder/i.test(probe)) {
+        failures++;
+        bad('scrcpy-server cannot start on this device:');
+        for (const l of probe.trim().split(/\r?\n/).slice(-15)) info(l);
+        const crash = await deviceCrashLog(adb, d.id);
+        if (crash.length) {
+          info('device log:');
+          for (const l of crash) info(`  ${l}`);
+        }
+        continue;
+      }
+      ok(`scrcpy-server starts; ${encoders.length} H.264 encoder(s):`);
+      for (const l of encoders) info(l.trim());
 
       let firstConfig: { w: number; h: number } | null = null;
       let frames = 0;
@@ -123,6 +153,11 @@ export async function runDoctor(cfg: AgentConfig, serial: string | null): Promis
         failures++;
         bad(`stream start failed: ${(err as Error).message}`);
         for (const s of steps) info(s);
+        const crash = await deviceCrashLog(adb, d.id);
+        if (crash.length) {
+          info('device log:');
+          for (const l of crash) info(`  ${l}`);
+        }
       } finally {
         await session.stop();
       }

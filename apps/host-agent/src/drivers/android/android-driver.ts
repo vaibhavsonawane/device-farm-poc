@@ -12,7 +12,8 @@ import {
   type StreamSink,
 } from '../driver';
 import { AdbBridge, shq, withTimeout } from './adb';
-import { checkScrcpyJar } from './scrcpy-jar';
+import { remoteSha256 } from './diagnostics';
+import { SCRCPY_SERVER_SHA256, checkScrcpyJar } from './scrcpy-jar';
 import {
   diffInstalled,
   parseBattery,
@@ -190,16 +191,26 @@ export class AndroidDriver implements DeviceDriver {
     return k;
   }
 
+  /** Push scrcpy-server unless the device already has the exact v3.3.1 file; verify after pushing. */
   private async ensureJar(serial: string, k: Known, sink?: StreamSink): Promise<void> {
     if (k.jarPushed) return;
     const problem = checkScrcpyJar(this.cfg.scrcpyServerPath);
     if (problem) throw new Error(problem);
-    sink?.status('starting', 'Pushing scrcpy-server to the device…');
-    await withTimeout(
-      this.adb.push(serial, this.cfg.scrcpyServerPath, DEVICE_JAR_PATH),
-      30_000,
-      'pushing scrcpy-server to the device timed out',
-    );
+    if ((await remoteSha256(this.adb, serial, DEVICE_JAR_PATH)) !== SCRCPY_SERVER_SHA256) {
+      sink?.status('starting', 'Pushing scrcpy-server to the device…');
+      await this.adb.shell(serial, `rm -f ${shq(DEVICE_JAR_PATH)}`).catch(() => undefined);
+      await withTimeout(
+        this.adb.push(serial, this.cfg.scrcpyServerPath, DEVICE_JAR_PATH),
+        30_000,
+        'pushing scrcpy-server to the device timed out',
+      );
+      const after = await remoteSha256(this.adb, serial, DEVICE_JAR_PATH);
+      if (after !== null && after !== SCRCPY_SERVER_SHA256) {
+        throw new Error(
+          `scrcpy-server on the device is corrupt after push (sha256 ${after.slice(0, 12)}…); check the USB cable/hub`,
+        );
+      }
+    }
     k.jarPushed = true;
   }
 
@@ -223,6 +234,7 @@ export class AndroidDriver implements DeviceDriver {
       await session.start();
     } catch (err) {
       await session.stop(); // remove the adb forward and kill the server process
+      k.jarPushed = false; // re-verify the jar on the next attempt
       throw err;
     }
     this.sessions.set(serial, session);

@@ -32,6 +32,7 @@ import { type Logger } from '../../logger';
 import { type StreamHandle, type StreamSink } from '../driver';
 import { type AdbBridge, withTimeout } from './adb';
 import { ByteReader } from './byte-reader';
+import { deviceCrashLog } from './diagnostics';
 
 export const DEVICE_JAR_PATH = '/data/local/tmp/scrcpy-server.jar';
 
@@ -129,17 +130,35 @@ export class ScrcpySession implements StreamHandle {
       this.log.info({ scrcpy: text }, 'scrcpy-server output');
       if (/ERROR|Exception/.test(text)) this.sink.status('error', text.slice(0, 300));
     });
+    let exited = false;
+    this.serverProc.on('end', () => {
+      exited = true;
+    });
+    this.serverProc.on('close', () => {
+      exited = true;
+    });
     const fail = (msg: string): Error =>
       new Error(
         serverOutput ? `${msg}. scrcpy-server said: ${serverOutput.trim().slice(-400)}` : msg,
       );
+    /** Same as fail(), plus the device log lines that explain a crash. */
+    const failWithDeviceLog = async (msg: string): Promise<Error> => {
+      const lines = await deviceCrashLog(this.adb, this.serial);
+      if (lines.length)
+        this.log.error({ serial: this.serial, deviceLog: lines }, 'scrcpy-server crash log');
+      const err = fail(msg);
+      return lines.length
+        ? new Error(`${err.message}. Device log: ${lines.slice(-6).join(' | ').slice(0, 900)}`)
+        : err;
+    };
 
     // With tunnel_forward the adb forward accepts immediately; the server is ready once the
     // dummy byte arrives on the first (video) socket. Give it ~12 s (first start can be slow).
     let video: net.Socket | null = null;
     let reader: ByteReader | null = null;
     const deadline = Date.now() + 12_000;
-    while (Date.now() < deadline && !this.stopped) {
+    // Stop waiting as soon as the server process has died (e.g. "Aborted").
+    while (Date.now() < deadline && !this.stopped && !(exited && serverOutput)) {
       let s: net.Socket | null = null;
       try {
         s = await connect(this.port);
@@ -154,8 +173,10 @@ export class ScrcpySession implements StreamHandle {
       }
     }
     if (!video || !reader) {
-      throw fail(
-        'scrcpy-server did not start (check the jar is v3.3.1 and USB debugging is allowed)',
+      throw await failWithDeviceLog(
+        exited
+          ? 'scrcpy-server exited on the device before accepting connections'
+          : 'scrcpy-server did not start (check the jar is v3.3.1 and USB debugging is allowed)',
       );
     }
     this.videoSocket = video;
